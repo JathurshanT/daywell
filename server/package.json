@@ -1,0 +1,1 @@
+{"name":"daywell-server","private":true,"type":"module","scripts":{"start":"node --env-file=.env index.mjs"},"dependencies":{"express":"^5.1.0","mongoose":"^8.19.0","dotenv":"^16.6.0"}}

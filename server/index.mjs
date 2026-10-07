@@ -1,0 +1,13 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import {fileURLToPath} from 'node:url';
+const app=express();app.disable('x-powered-by');app.use(express.json({limit:'100kb'}));
+const schema=new mongoose.Schema({date:{type:String,required:true,unique:true},sugar:{type:String,enum:['none','yes',null],default:null},steps:{type:Number,min:0,max:200000,default:0},tasks:[{_id:false,id:String,title:String,done:Boolean}],notes:{type:String,maxlength:10000,default:''},sugarNote:{type:String,maxlength:500,default:''}},{versionKey:false});
+const Day=mongoose.model('Day',schema);
+app.get('/api/days',async(req,res,next)=>{try{const rows=await Day.find().lean();res.json(Object.fromEntries(rows.map(({date,_id,...day})=>[date,day])));}catch(e){next(e);}});
+app.put('/api/days/:date',async(req,res,next)=>{try{const d=req.params.date,b=req.body;if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!['none','yes',null].includes(b.sugar)||!Number.isInteger(b.steps)||b.steps<0||b.steps>200000||typeof b.notes!=='string'||b.notes.length>10000||typeof b.sugarNote!=='string'||b.sugarNote.length>500||!Array.isArray(b.tasks)||b.tasks.length>500||b.tasks.some(t=>typeof t.id!=='string'||typeof t.title!=='string'||t.title.length>140||typeof t.done!=='boolean'))return res.status(400).json({error:'Invalid daily entry'});await Day.findOneAndUpdate({date:d},{$set:{sugar:b.sugar,steps:b.steps,tasks:b.tasks.map(({id,title,done})=>({id,title,done})),notes:b.notes,sugarNote:b.sugarNote}},{upsert:true,runValidators:true});res.json({saved:true});}catch(e){next(e);}});
+const root=fileURLToPath(new URL('../mern-dist/',import.meta.url));app.use(express.static(root));app.get('/{*path}',(req,res)=>res.sendFile(root+'index.html'));
+app.use((err,req,res,next)=>{console.error(err.message);res.status(500).json({error:'Database request failed'});});
+if(!process.env.MONGODB_URI)throw new Error('Set MONGODB_URI in server/.env');
+await mongoose.connect(process.env.MONGODB_URI);
+app.listen(Number(process.env.PORT)||4000,'127.0.0.1',()=>console.log('Daywell: http://localhost:'+(process.env.PORT||4000)));
